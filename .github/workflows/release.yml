@@ -53,7 +53,7 @@ jobs:
       # zig as the C compiler and linker for musl (ring's C and assembly), both architectures
       # from one x86_64 runner.
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
-      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
         with:
           tool: cargo-zigbuild
       - name: Build
