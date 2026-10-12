@@ -50,7 +50,7 @@ ureq = { version = "3.4", default-features = false, features = ["gzip"] }
 sha2 = "0.11"
 flate2 = "1.1"
 lzma-rs = "0.3"
-zip = { version = "8.6", default-features = false, features = ["deflate-flate2"] }
+zip = { version = "9.0", default-features = false, features = ["deflate-flate2"] }
 globset = "0.4"
 # Windows: link fallbacks, elevation, secrets-file ACLs
 junction = "2.1"
