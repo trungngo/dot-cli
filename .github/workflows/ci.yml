@@ -1,0 +1,110 @@
+# Formatting, lints and tests. Runs on every pull request, on pushes to main, and by hand
+# (Actions > CI > Run workflow). GitHub Actions is free for public repositories, on the Linux,
+# macOS and Windows runners alike.
+#
+# - fmt: `cargo fmt --check`.
+# - test: clippy (warnings are errors) and the whole test suite on Linux, macOS and Windows.
+#   Tests never touch the real home directory, use the network or run real package managers:
+#   they use temp dirs and fake tools on a temp PATH. The suite includes docs/reference.md
+#   being up to date with the schemas and examples/basic planning and applying in a temp home;
+#   `dot check` on the example also runs as a step of its own.
+# - msrv: the workspace builds with the `rust-version` Cargo.toml declares.
+# - container: the end-to-end tests (the built `dot` binary against temp repositories) in a
+#   minimal ubuntu:24.04 image, the server profile's base, as an ordinary user.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --locked --no-fail-fast
+      - name: Example repository
+        run: cargo run --locked -q -p dot-cli -- check --repo examples/basic
+
+  msrv:
+    name: msrv (rust-version)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Toolchain from Cargo.toml
+        run: |
+          v=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
+          echo "rust-version: $v"
+          rustup toolchain install "$v" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=$v" >> "$GITHUB_ENV"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - run: cargo check --workspace --all-targets --locked
+
+  container:
+    name: e2e (ubuntu:24.04 container)
+    runs-on: ubuntu-latest
+    container: ubuntu:24.04
+    env:
+      RUSTUP_HOME: /usr/local/rustup
+      CARGO_HOME: /usr/local/cargo
+    steps:
+      - name: Build tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            build-essential ca-certificates curl git
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Rust toolchain (shared, for the test user)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+            | sh -s -- -y --profile minimal --no-modify-path
+          chmod -R a+rX "$RUSTUP_HOME" "$CARGO_HOME"
+      - name: Test user
+        run: |
+          useradd --create-home tester
+          chown -R tester "$GITHUB_WORKSPACE"
+      # As an ordinary user, like the machines `dot` sets up: root would change what the
+      # privilege and writability checks see.
+      - name: End-to-end tests
+        run: |
+          runuser -u tester -- env \
+            PATH="$CARGO_HOME/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+            HOME=/home/tester RUSTUP_HOME="$RUSTUP_HOME" CARGO_HOME=/home/tester/.cargo \
+            CARGO_TERM_COLOR=always RUST_BACKTRACE=1 \
+            cargo test --locked --no-fail-fast -p dot-cli --test '*'

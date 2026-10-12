@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://github.com/trungngo/dot-cli/releases/latest/download/bundle.schema.json
+#
+# macOS only: a bundle-level `when:` skips it everywhere else.
+
+when: { os: macos }
+steps:
+  - macos_defaults:
+      - { domain: com.apple.dock, key: autohide, type: bool, value: true }
+      - { domain: NSGlobalDomain, key: AppleShowAllExtensions, type: bool, value: true }

@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://github.com/trungngo/dot-cli/releases/latest/download/dot.schema.json
+#
+# The repository's root: which kinds of machine there are (profiles), what each applies, and
+# values every bundle can use.
+
+vars:
+  # Committed, non-secret values. `.env` and `~/.config/dot/local.env` can override them.
+  # Variables only one bundle needs are declared in that bundle (see bundles/git/bundle.yml).
+  editor: vim
+
+# Package names that differ per package manager. A `package: [fd]` step installs `fd-find` with
+# apt and `fd` with Homebrew.
+packages:
+  fd: { apt: fd-find, brew: fd }
+  ripgrep: { apt: ripgrep, brew: ripgrep }
+
+profiles:
+  macos:
+    description: A Mac.
+    match: { os: macos }
+    bundles: [shell, git, cli-tools, api-client, macos]
+  ubuntu:
+    description: Ubuntu, desktop or server.
+    match: { distro: ubuntu }
+    bundles: [shell, git, cli-tools, api-client]

@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://github.com/trungngo/dot-cli/releases/latest/download/bundle.schema.json
+#
+# Always applied (`implicit: true`), before everything else: what later bundles need.
+
+implicit: true
+steps:
+  # macOS: Homebrew, which the `package` steps use there. Its installer uses sudo, which dot
+  # asks for once, up front (`sudo: true`), instead of the installer prompting mid-run.
+  - shell:
+      cmd: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      unless: test -x "{{ homebrew_prefix }}/bin/brew"
+      env: { NONINTERACTIVE: "1" }
+      sudo: true
+    label: Install Homebrew
+    when: { os: macos }
+  # Later steps and bundles that `requires` / `after` this one find `brew` here, even on the
+  # run that installed it. Your shell gets it through `dot env` (see bundles/shell).
+  - path: ["{{ homebrew_prefix }}/bin"]
+    label: Homebrew on PATH
+    when: { os: macos }
+  - package: [curl, git]
+    when: { os: linux }
+  - create: [~/.config, ~/.local/bin]
+  - path: [~/.local/bin]

@@ -1,0 +1,46 @@
+[package]
+name = "dot-secrets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Secret providers (envfile, LastPass) and secret handling for dot"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[features]
+default = ["secrets-lastpass", "secrets-1password"]
+secrets-lastpass = []
+secrets-1password = []
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_yaml_ng.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
+dirs.workspace = true
+dotenvy.workspace = true
+zeroize.workspace = true
+age.workspace = true
+tar.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_Threading"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+# The provider against a fake `lpass`: this test binary is also the fake, so it has its own
+# `main` (see the file's header).
+[[test]]
+name = "lastpass"
+harness = false
+required-features = ["secrets-lastpass"]

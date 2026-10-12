@@ -1,0 +1,61 @@
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# Checked by the `msrv` CI job.
+rust-version = "1.89"
+license = "MIT"
+authors = ["Trung Ngo"]
+repository = "https://github.com/trungngo/dot-cli"
+homepage = "https://trungngo.github.io/dot-cli/"
+documentation = "https://github.com/trungngo/dot-cli/blob/main/docs/reference.md"
+readme = "README.md"
+keywords = ["dotfiles", "bootstrap", "provisioning", "symlink", "config"]
+categories = ["command-line-utilities", "config"]
+# Not published to crates.io: the `dot-cli` name is taken there, and the libraries are
+# internal. Install from the releases, or `cargo install --locked --git <repository> dot-cli`.
+publish = false
+
+[workspace.dependencies]
+dot-core = { path = "crates/dot-core" }
+dot-directives = { path = "crates/dot-directives" }
+dot-platform = { path = "crates/dot-platform" }
+dot-secrets = { path = "crates/dot-secrets" }
+anyhow = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml_ng = "0.10"
+serde_json = "1"
+schemars = "1.2"
+humantime = "2.4"
+dirs = "6"
+tempfile = "3.27"
+petgraph = { version = "0.8", default-features = false, features = ["std", "graphmap"] }
+minijinja = "2.24"
+dotenvy = "0.15"
+os_info = { version = "3", default-features = false }
+regex = "1"
+zeroize = "1.9"
+indicatif = "0.18"
+console = "0.16"
+libc = "0.2"
+age = "0.12"
+tar = { version = "0.4", default-features = false }
+# github_release / git
+ureq = { version = "3.4", default-features = false, features = ["gzip"] }
+sha2 = "0.11"
+flate2 = "1.1"
+lzma-rs = "0.3"
+zip = { version = "8.6", default-features = false, features = ["deflate-flate2"] }
+globset = "0.4"
+# Windows: link fallbacks, elevation, secrets-file ACLs
+junction = "2.1"
+windows-sys = "0.61"
+
+[profile.release]
+strip = true
+lto = "thin"

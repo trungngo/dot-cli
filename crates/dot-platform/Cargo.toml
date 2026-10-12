@@ -1,0 +1,39 @@
+[package]
+name = "dot-platform"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Package managers, service managers, link strategies and sudo for dot"
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+dot-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+# HTTP for `github_release`: rustls (ring, bundled webpki roots) everywhere but Windows, which uses
+# the system TLS stack (SChannel) and certificate store: ring's C and assembly cannot be built for
+# the MSVC target without the Windows SDK, and the system store is what Windows users expect.
+[target.'cfg(not(windows))'.dependencies]
+ureq = { workspace = true, features = ["rustls"] }
+
+[target.'cfg(windows)'.dependencies]
+ureq = { workspace = true, features = ["native-tls"] }
+junction.workspace = true
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading", "Win32_System_Environment", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }
+
+[dev-dependencies]
+tempfile.workspace = true

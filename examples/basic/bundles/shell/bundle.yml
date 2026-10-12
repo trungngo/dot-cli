@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://github.com/trungngo/dot-cli/releases/latest/download/bundle.schema.json
+#
+# Shell setup: files linked from this directory, and a few lines added to a file dot does not
+# own.
+
+after: [common]
+steps:
+  - link:
+      ~/.inputrc: inputrc
+      ~/.config/example-shell/aliases.sh: aliases.sh
+  # A managed block in ~/.bashrc (and ~/.zshrc): dot owns only the lines between its markers.
+  # The second line loads what `path:` and `env:` steps set up (common's `~/.local/bin`, and
+  # Homebrew on macOS) and the environment-style variables of dot.yml and .env; see `dot env
+  # --help`.
+  - block:
+      file: ~/.bashrc
+      content: |
+        [ -f ~/.config/example-shell/aliases.sh ] && . ~/.config/example-shell/aliases.sh
+        [ -x ~/.local/bin/dot ] && . "$(~/.local/bin/dot env --shell bash --cache)"
+    when: { os: linux }
+  - block:
+      file: ~/.zshrc
+      content: |
+        [ -f ~/.config/example-shell/aliases.sh ] && . ~/.config/example-shell/aliases.sh
+        [ -x ~/.local/bin/dot ] && . "$(~/.local/bin/dot env --shell zsh --cache)"
+    when: { os: macos }

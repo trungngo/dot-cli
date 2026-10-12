@@ -1,0 +1,22 @@
+name: Feature request
+description: A directive, platform, option or command dot should have.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The setup task, and how you do it today (a `shell` step, a script, another tool).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like to write
+      description: The bundle.yml you would like to work, if you have one in mind.
+      render: yaml
+  - type: textarea
+    id: platforms
+    attributes:
+      label: Platforms it matters on
+      placeholder: macOS, Ubuntu desktop, Ubuntu server, Windows, WSL, ...

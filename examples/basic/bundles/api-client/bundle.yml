@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://github.com/trungngo/dot-cli/releases/latest/download/bundle.schema.json
+#
+# A config file holding a secret. The template asks for it by logical name; secrets.yml says
+# where it lives. The file is written owner-only (0600), and the value never appears in dot's
+# output or logs.
+
+after: [common]
+steps:
+  - template:
+      ~/.config/example-api/config.env:
+        src: config.env.j2
+        mode: "0600"

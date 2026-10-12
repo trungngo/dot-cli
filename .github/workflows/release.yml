@@ -1,0 +1,182 @@
+# Builds and publishes a release when a `v*` tag is pushed (`git tag v0.2.0 && git push origin
+# v0.2.0`), or when started by hand from a tag (Actions > Release > Run workflow, choosing the
+# tag). The publish step refuses to run from anything but a `v*` tag.
+#
+# Asset names are what install.sh, install.ps1 and `dot self-update` fetch; change them
+# together or not at all:
+#
+#   dot-x86_64-unknown-linux-musl.tar.gz    static Linux binaries (`dot` at the archive root)
+#   dot-aarch64-unknown-linux-musl.tar.gz
+#   dot-universal-apple-darwin.tar.gz       x86_64 + aarch64, joined with lipo
+#   dot-x86_64-pc-windows-msvc.zip          `dot.exe` at the archive root
+#   dot-aarch64-pc-windows-msvc.zip
+#   SHA256SUMS                              `<sha256>  <file>` for every asset above
+#   bundle.schema.json, dot.schema.json, secrets.schema.json   from `dot schema`
+#
+# The tag must match the workspace version (`v0.2.0` for 0.2.0): `dot self-update` compares
+# the two.
+#
+# Every asset gets a signed build provenance attestation (Sigstore, through GitHub), which
+# `gh attestation verify <file> -R trungngo/dot-cli` checks: it proves the file was built by
+# this workflow from this repository's tag, which SHA256SUMS (from the same release) cannot.
+# GitHub attests public repositories on every plan; a private one is skipped.
+#
+# Third-party actions are pinned to commit SHAs (Dependabot keeps them current): this workflow
+# can write releases.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    name: build (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      # zig as the C compiler and linker for musl (ring's C and assembly), both architectures
+      # from one x86_64 runner.
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+      - uses: taiki-e/install-action@83ac0ad63c0167e6f06796fab0fce28db1bf3db0 # v2.87.22
+        with:
+          tool: cargo-zigbuild
+      - name: Build
+        run: cargo zigbuild --release --locked -p dot-cli --target ${{ matrix.target }}
+      - name: Package
+        run: |
+          mkdir -p dist
+          tar -C target/${{ matrix.target }}/release -czf dist/dot-${{ matrix.target }}.tar.gz dot
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dot-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    name: build (universal-apple-darwin)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          targets: x86_64-apple-darwin, aarch64-apple-darwin
+      - name: Build
+        run: |
+          cargo build --release --locked -p dot-cli --target x86_64-apple-darwin
+          cargo build --release --locked -p dot-cli --target aarch64-apple-darwin
+      - name: Package
+        run: |
+          mkdir -p dist universal
+          lipo -create -output universal/dot \
+            target/x86_64-apple-darwin/release/dot \
+            target/aarch64-apple-darwin/release/dot
+          lipo -info universal/dot
+          tar -C universal -czf dist/dot-universal-apple-darwin.tar.gz dot
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dot-universal-apple-darwin
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    name: build (${{ matrix.target }})
+    runs-on: windows-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        target: [x86_64-pc-windows-msvc, aarch64-pc-windows-msvc]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: Build
+        run: cargo build --release --locked -p dot-cli --target ${{ matrix.target }}
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path "target/${{ matrix.target }}/release/dot.exe" `
+            -DestinationPath "dist/dot-${{ matrix.target }}.zip"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dot-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write # the attestation's signing certificate
+      attestations: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          pattern: dot-*
+          merge-multiple: true
+      - name: Check the tag against the built version
+        run: |
+          tar -xzf dist/dot-x86_64-unknown-linux-musl.tar.gz -C "$RUNNER_TEMP" dot
+          built=$("$RUNNER_TEMP/dot" --version)
+          echo "built: $built, tag: $GITHUB_REF_NAME"
+          [ "dot ${GITHUB_REF_NAME#v}" = "$built" ] || {
+            echo "::error::tag $GITHUB_REF_NAME does not match $built (bump the workspace version)"
+            exit 1
+          }
+      - name: JSON schemas
+        run: |
+          "$RUNNER_TEMP/dot" schema bundle > dist/bundle.schema.json
+          "$RUNNER_TEMP/dot" schema repo > dist/dot.schema.json
+          "$RUNNER_TEMP/dot" schema secrets > dist/secrets.schema.json
+      - name: Checksums
+        working-directory: dist
+        run: |
+          for f in dot-x86_64-unknown-linux-musl.tar.gz dot-aarch64-unknown-linux-musl.tar.gz \
+                   dot-universal-apple-darwin.tar.gz dot-x86_64-pc-windows-msvc.zip \
+                   dot-aarch64-pc-windows-msvc.zip; do
+            [ -f "$f" ] || { echo "::error::missing asset $f"; exit 1; }
+          done
+          sha256sum -- dot-* *.schema.json > SHA256SUMS
+          cat SHA256SUMS
+      - name: Provenance attestation
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            dist/dot-*
+            dist/*.schema.json
+      # Created as a draft, filled, then published: the installers and `dot self-update` take the
+      # latest published release, which must never be one whose assets are still uploading.
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          case "$TAG" in v*) ;; *) echo "::error::run this from a v* tag, not $TAG"; exit 1 ;; esac
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --draft --verify-tag --title "$TAG" --generate-notes
+          fi
+          gh release upload "$TAG" --clobber dist/*
+          gh release edit "$TAG" --draft=false

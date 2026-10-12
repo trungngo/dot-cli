@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dot — set up a machine from your dotfiles</title>
+<meta name="description" content="dot sets up and maintains macOS, Linux and Windows machines from a repository of YAML bundles. One static binary. Plan before you apply.">
+<style>
+  :root {
+    --bg: #fbfaf7;
+    --surface: #ffffff;
+    --ink: #17181c;
+    --muted: #5d6170;
+    --line: #e4e2dc;
+    --accent: #2f6fdb;
+    --accent-ink: #ffffff;
+    --ok: #1f8a5b;
+    --warn: #b7791f;
+    --code-bg: #f1f0ec;
+    --code-ink: #1c1d22;
+    --radius: 14px;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1115;
+      --surface: #171a21;
+      --ink: #eceef3;
+      --muted: #9aa1b2;
+      --line: #2a2e3a;
+      --accent: #7aa7ff;
+      --accent-ink: #0b1220;
+      --ok: #5fd39c;
+      --warn: #f0b75e;
+      --code-bg: #1d212b;
+      --code-ink: #e6e8ee;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1115;
+    --surface: #171a21;
+    --ink: #eceef3;
+    --muted: #9aa1b2;
+    --line: #2a2e3a;
+    --accent: #7aa7ff;
+    --accent-ink: #0b1220;
+    --ok: #5fd39c;
+    --warn: #f0b75e;
+    --code-bg: #1d212b;
+    --code-ink: #e6e8ee;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 var(--sans);
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+  section { padding: 72px 0; }
+  h1, h2, h3 { line-height: 1.15; margin: 0 0 12px; letter-spacing: -0.01em; }
+  h1 { font-size: clamp(2.2rem, 5.5vw, 3.6rem); }
+  h2 { font-size: clamp(1.6rem, 3.5vw, 2.2rem); }
+  h3 { font-size: 1.1rem; }
+  p { margin: 0 0 14px; }
+  .lead { font-size: clamp(1.05rem, 2.2vw, 1.25rem); color: var(--muted); max-width: 46rem; }
+  .eyebrow {
+    font: 600 13px/1 var(--sans); text-transform: uppercase; letter-spacing: .12em;
+    color: var(--accent); margin-bottom: 14px;
+  }
+  code, pre, .mono { font-family: var(--mono); font-size: 14px; }
+  code { background: var(--code-bg); color: var(--code-ink); padding: 2px 6px; border-radius: 6px; }
+
+  /* top bar */
+  .top {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .top .wrap { display: flex; align-items: center; gap: 20px; height: 56px; }
+  .brand { font: 700 18px var(--mono); color: var(--ink); }
+  .brand span { color: var(--accent); }
+  .top nav { margin-left: auto; display: flex; gap: 18px; font-size: 15px; }
+  .top nav a { color: var(--muted); }
+  .top nav a:hover { color: var(--ink); }
+  @media (max-width: 640px) { .top nav a:not(.gh) { display: none; } }
+
+  /* buttons */
+  .btns { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 18px; border-radius: 10px; font-weight: 600; font-size: 15px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    cursor: pointer; font-family: inherit;
+  }
+  .btn:hover { text-decoration: none; border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .btn.primary:hover { filter: brightness(1.06); }
+
+  /* hero */
+  .hero { padding: 88px 0 56px; }
+  .pill {
+    display: inline-flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted);
+    border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 999px;
+    margin-bottom: 22px;
+  }
+  .pill b { color: var(--ok); font-weight: 600; }
+  .install-line {
+    margin-top: 36px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 14px 16px; display: flex; gap: 12px; align-items: center;
+    max-width: 760px; overflow: hidden;
+  }
+  .install-line .prompt { color: var(--muted); user-select: none; }
+  .install-line code {
+    background: none; padding: 0; flex: 1; overflow-x: auto; white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .copy {
+    flex: none; font: 600 13px var(--sans); color: var(--muted); background: var(--code-bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+  }
+  .copy:hover { color: var(--ink); }
+  .copy.done { color: var(--ok); }
+  .note { font-size: 14px; color: var(--muted); margin-top: 12px; }
+
+  /* terminal */
+  .term {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius);
+    overflow: hidden; margin-top: 8px;
+  }
+  .term-bar {
+    display: flex; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); display: block; }
+  .term pre {
+    margin: 0; padding: 18px 20px; overflow-x: auto; color: var(--code-ink); line-height: 1.55;
+  }
+  .c-dim { color: var(--muted); }
+  .c-ok { color: var(--ok); }
+  .c-warn { color: var(--warn); }
+  .c-accent { color: var(--accent); }
+
+  /* grid of features */
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); margin-top: 36px; }
+  .term { max-width: 100%; }
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px;
+  }
+  .card p { color: var(--muted); font-size: 15px; margin: 0; }
+  .card .ico {
+    width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
+    font: 700 16px var(--mono); margin-bottom: 14px;
+  }
+
+  /* split */
+  .split { display: grid; gap: 40px; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; }
+  .split > * { min-width: 0; }
+  @media (max-width: 860px) { .split { grid-template-columns: minmax(0, 1fr); } }
+  .checklist { list-style: none; padding: 0; margin: 20px 0 0; }
+  .checklist li { padding: 8px 0 8px 30px; position: relative; color: var(--muted); }
+  .checklist li::before {
+    content: "✓"; position: absolute; left: 0; top: 8px; color: var(--ok); font-weight: 700;
+  }
+  .checklist li strong { color: var(--ink); font-weight: 600; }
+
+  /* platforms and downloads */
+  .band { background: var(--surface); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 15px; }
+  th, td { text-align: left; padding: 14px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  td a { font-weight: 600; }
+  .tag {
+    display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+    background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok);
+  }
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* tabs */
+  .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-top: 24px; }
+  .tabs button {
+    font: 600 14px var(--sans); padding: 9px 16px; background: var(--surface); color: var(--muted);
+    border: 0; cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+  .tab-panel { margin-top: 14px; }
+  .tab-panel[hidden] { display: none; }
+  .tab-panel pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 18px 20px; overflow-x: auto; margin: 0; color: var(--code-ink); line-height: 1.6;
+  }
+
+  /* checksums */
+  details { margin-top: 20px; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+  details pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; overflow-x: auto; font-size: 13px; color: var(--code-ink);
+  }
+
+  footer { padding: 40px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; justify-content: space-between; }
+  footer nav { display: flex; gap: 18px; flex-wrap: wrap; }
+  footer a { color: var(--muted); }
+
+  @media (max-width: 640px) {
+    section { padding: 52px 0; }
+    .hero { padding: 56px 0 40px; }
+    .btns .btn { flex: 1 1 100%; justify-content: center; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top">dot<span>_</span></a>
+    <nav>
+      <a href="#why">Why</a>
+      <a href="#how">How it works</a>
+      <a href="#download">Download</a>
+      <a href="#install">Install</a>
+      <a class="gh" href="https://github.com/trungngo/dot-cli">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="hero">
+  <div class="wrap">
+    <div class="pill"><b>v0.1.0</b> · MIT · one static binary</div>
+    <h1>Set up any machine from your dotfiles.</h1>
+    <p class="lead">
+      <code>dot</code> reads bundles of YAML from your repository, works out what this machine is,
+      and links, copies, templates, installs and runs setup steps in dependency order. It shows you
+      the plan before it changes anything.
+    </p>
+
+    <div class="btns">
+      <a class="btn primary" href="#download">Download v0.1.0</a>
+      <a class="btn" href="https://github.com/trungngo/dot-cli">View on GitHub</a>
+    </div>
+
+    <div class="install-line" role="group" aria-label="Install command">
+      <span class="prompt mono">$</span>
+      <code id="one-liner">curl -fsSL https://raw.githubusercontent.com/trungngo/dot-cli/main/install.sh | sh</code>
+      <button class="copy" type="button" data-copy="#one-liner">Copy</button>
+    </div>
+    <p class="note">macOS and Linux. Windows: <a href="#install">PowerShell command below</a>. No token or root access needed.</p>
+  </div>
+</section>
+
+<section id="how" style="padding-top: 8px">
+  <div class="wrap">
+    <div class="eyebrow">Plan, then apply</div>
+    <h2>See every change before it happens.</h2>
+    <p class="lead">Every step plans without side effects first. Run <code>dot plan</code> to read the
+      diff, then <code>dot apply</code> when it looks right.</p>
+
+    <div class="term" style="margin-top: 36px">
+      <div class="term-bar"><i></i><i></i><i></i></div>
+<pre><span class="c-dim">$</span> dot plan
+<span class="c-dim">repo: ~/.dot  ·  profile: macos (matched os=macos)</span>
+<span class="c-dim">bundles, in order:</span> common, api-client, cli-tools, git, macos, shell
+
+<span class="c-accent">cli-tools</span>
+  package fd, ripgrep
+    ~ brew: install fd, ripgrep <span class="c-dim">[pending]</span>
+<span class="c-accent">git</span>
+  template ~/.gitconfig  <span class="c-dim">(uses git_email, git_name)</span>
+    ? template ~/.gitconfig <span class="c-dim">[unknown until apply]</span>
+<span class="c-accent">shell</span>
+  - block ~/.bashrc <span class="c-dim">(skipped: when: os is macos)</span>
+  block ~/.zshrc
+    <span class="c-warn">~</span> block ~/.zshrc <span class="c-dim">[# &gt;&gt;&gt; dot:shell &gt;&gt;&gt;]</span>
+
+<span class="c-dim">Nothing changed yet. Run</span> <span class="c-ok">dot apply</span> <span class="c-dim">to continue.</span></pre>
+    </div>
+  </div>
+</section>
+
+<section id="why" class="band">
+  <div class="wrap">
+    <div class="eyebrow">Why dot</div>
+    <h2>One binary. Your repo. Nothing hidden.</h2>
+    <p class="lead">Built for people who keep their machines in git and want the setup to be boring.</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="ico">{ }</div>
+        <h3>Bundles and a graph</h3>
+        <p>Each bundle is a list of steps with <code>requires</code> and <code>after</code> edges. dot resolves them into one order, runs each bundle once, and skips the dependents of a failure.</p>
+      </div>
+      <div class="card">
+        <div class="ico">os</div>
+        <h3>Profiles and facts</h3>
+        <p>dot detects OS, distro, arch, role (desktop or server), WSL, containers, VMs, and the package manager. Profiles pick bundles from those facts, and <code>when:</code> narrows any step.</p>
+      </div>
+      <div class="card">
+        <div class="ico">dry</div>
+        <h3>Plan, status, diff</h3>
+        <p><code>dot plan</code>, <code>apply --dry-run</code>, <code>status</code> for drift, and <code>diff</code>. <code>dot remove</code> undoes what was recorded.</p>
+      </div>
+      <div class="card">
+        <div class="ico">pkg</div>
+        <h3>Real package managers</h3>
+        <p>apt, dnf, zypper, pacman, apk, Homebrew and casks, snap, winget, scoop, and VS Code extensions, each with its own package names.</p>
+      </div>
+      <div class="card">
+        <div class="ico">key</div>
+        <h3>Secrets stay out of git</h3>
+        <p>Bundles ask for <code>secret("name")</code>. Values come from an owner-only env file or LastPass, and they are redacted in all output and logs.</p>
+      </div>
+      <div class="card">
+        <div class="ico">ssh</div>
+        <h3>Remote machines</h3>
+        <p><code>dot apply --host user@server</code> installs dot on the server, syncs the repo, and hands secrets over ssh in memory only. <code>dot cloud-init</code> does the same on first boot.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap split">
+    <div>
+      <div class="eyebrow">Your repository, your rules</div>
+      <h2>Plain YAML and plain files.</h2>
+      <p class="lead">Nothing to learn beyond a small set of directives. Configuration is a repo you already
+        own, not a service you have to sign in to.</p>
+      <ul class="checklist">
+        <li><strong>Link, copy, template</strong> files, including managed blocks inside files you don't own.</li>
+        <li><strong>Services, users, macOS defaults, PATH and env</strong> as first-class steps.</li>
+        <li><strong>Inspect first:</strong> <code>dot check</code>, <code>dot doctor</code>, <code>dot why</code> and <code>dot graph</code>.</li>
+        <li><strong>Reproducible installs</strong> from a release checked against <code>SHA256SUMS</code>.</li>
+      </ul>
+    </div>
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i></div>
+<pre><span class="c-dim"># example output</span>
+<span class="c-dim">$</span> dot status
+<span class="c-ok">✓</span> ~/.gitconfig          in sync
+<span class="c-ok">✓</span> ~/.inputrc            in sync
+<span class="c-warn">!</span> ~/.config/aliases.sh  edited on this machine
+    <span class="c-dim">run</span> dot diff <span class="c-dim">to see it, or</span> dot adopt <span class="c-dim">to keep it</span>
+
+<span class="c-dim">$</span> dot apply --host user@server
+<span class="c-ok">✓</span> dot installed on server
+<span class="c-ok">✓</span> repo synced, 3 secrets resolved here
+<span class="c-ok">✓</span> applied in 14 steps</pre>
+    </div>
+  </div>
+</section>
+
+<section id="download" class="band">
+  <div class="wrap">
+    <div class="eyebrow">Download</div>
+    <h2>Release v0.1.0</h2>
+    <p class="lead">Pick your platform. Every archive is listed in <code>SHA256SUMS</code>.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Platform</th><th>File</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>macOS (Apple silicon and Intel)</td><td><a href="https://github.com/trungngo/dot-cli/releases/download/v0.1.0/dot-universal-apple-darwin.tar.gz">dot-universal-apple-darwin.tar.gz</a></td><td>Universal binary</td></tr>
+          <tr><td>Linux x86_64</td><td><a href="https://github.com/trungngo/dot-cli/releases/download/v0.1.0/dot-x86_64-unknown-linux-musl.tar.gz">dot-x86_64-unknown-linux-musl.tar.gz</a></td><td>Static (musl)</td></tr>
+          <tr><td>Linux arm64</td><td><a href="https://github.com/trungngo/dot-cli/releases/download/v0.1.0/dot-aarch64-unknown-linux-musl.tar.gz">dot-aarch64-unknown-linux-musl.tar.gz</a></td><td>Static (musl)</td></tr>
+          <tr><td>Windows x86_64</td><td><a href="https://github.com/trungngo/dot-cli/releases/download/v0.1.0/dot-x86_64-pc-windows-msvc.zip">dot-x86_64-pc-windows-msvc.zip</a></td><td><code>dot.exe</code></td></tr>
+          <tr><td>Windows arm64</td><td><a href="https://github.com/trungngo/dot-cli/releases/download/v0.1.0/dot-aarch64-pc-windows-msvc.zip">dot-aarch64-pc-windows-msvc.zip</a></td><td><code>dot.exe</code></td></tr>
+          <tr><td>Checksums</td><td><a href="https://github.com/trungngo/dot-cli/releases/download/v0.1.0/SHA256SUMS">SHA256SUMS</a></td><td>SHA-256 for every file</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="note" style="margin-top: 18px">Prefer the newest release? Use <a href="https://github.com/trungngo/dot-cli/releases/latest">releases/latest</a>.</p>
+
+    <details>
+      <summary>Verify a download</summary>
+      <pre>shasum -a 256 -c SHA256SUMS --ignore-missing</pre>
+    </details>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="eyebrow">Install</div>
+    <h2>One command, then <code>dot apply</code>.</h2>
+    <p class="lead">The installer fetches the release, checks it against <code>SHA256SUMS</code>, and puts
+      <code>dot</code> on your PATH. Add a dotfiles repo to set the machine up in the same step.</p>
+
+    <div class="tabs" role="tablist" aria-label="Platform">
+      <button role="tab" aria-selected="true" aria-controls="tab-sh" id="btn-sh">macOS / Linux</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-ps" id="btn-ps">Windows</button>
+    </div>
+
+    <div class="tab-panel" id="tab-sh" role="tabpanel" aria-labelledby="btn-sh">
+<pre># Install dot only
+curl -fsSL https://raw.githubusercontent.com/trungngo/dot-cli/main/install.sh | sh
+
+# Install, then clone and apply your dotfiles
+curl -fsSL https://raw.githubusercontent.com/trungngo/dot-cli/main/install.sh \
+  | sh -s -- https://github.com/you/dotfiles.git
+
+# Pin a release
+curl -fsSL https://raw.githubusercontent.com/trungngo/dot-cli/v0.1.0/install.sh \
+  | DOT_VERSION=v0.1.0 sh</pre>
+    </div>
+
+    <div class="tab-panel" id="tab-ps" role="tabpanel" aria-labelledby="btn-ps" hidden>
+<pre># Install dot only (Windows PowerShell 5.1 or PowerShell 7)
+iwr -useb https://raw.githubusercontent.com/trungngo/dot-cli/main/install.ps1 | iex
+
+# Install, then clone and apply your dotfiles
+$env:DOT_DOTFILES_URL = 'https://github.com/you/dotfiles.git'
+iwr -useb https://raw.githubusercontent.com/trungngo/dot-cli/main/install.ps1 | iex
+
+# Pin a release
+$env:DOT_VERSION = 'v0.1.0'
+iwr -useb https://raw.githubusercontent.com/trungngo/dot-cli/v0.1.0/install.ps1 | iex</pre>
+    </div>
+
+    <p class="note">No token needed for dot's public releases. A GitHub token is only used for a private
+      dotfiles repository.</p>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>dot · MIT licensed · <span class="mono">dot_</span></div>
+    <nav>
+      <a href="https://github.com/trungngo/dot-cli">GitHub</a>
+      <a href="https://github.com/trungngo/dot-cli/releases">Releases</a>
+      <a href="https://github.com/trungngo/dot-cli/blob/main/docs/reference.md">Reference</a>
+      <a href="https://github.com/trungngo/dot-cli/blob/main/SECURITY.md">Security</a>
+      <a href="https://github.com/trungngo/dot-cli/blob/main/CHANGELOG.md">Changelog</a>
+    </nav>
+  </div>
+</footer>
+
+<script>
+  // Copy buttons: copy the text of the element they point at.
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var el = document.querySelector(btn.getAttribute('data-copy'));
+      if (!el) return;
+      var text = el.textContent.trim();
+      var done = function () {
+        btn.textContent = 'Copied';
+        btn.classList.add('done');
+        setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1600);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () {});
+      }
+    });
+  });
+
+  // macOS / Windows tabs.
+  var tabs = document.querySelectorAll('[role="tab"]');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) {
+        var on = t === tab;
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+        document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+      });
+    });
+  });
+</script>
+</body>
+</html>

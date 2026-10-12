@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://github.com/trungngo/dot-cli/releases/latest/download/bundle.schema.json
+#
+# git, and a ~/.gitconfig rendered from a template with variables.
+
+requires: [common]
+
+# Declared here, not in dot.yml, so only a run that includes this bundle needs them. The first
+# `dot apply` that does asks for them once and keeps the answers in ~/.config/dot/local.env
+# (`persist: local`); `--var git_name=...` gives them without asking.
+vars:
+  git_name: { required: true, prompt: "Your name, for git commits", persist: local }
+  git_email:
+    required: true
+    pattern: ".+@.+"
+    prompt: "Your email, for git commits"
+    persist: local
+
+steps:
+  - package:
+      brew: [git]
+    when: { os: macos }
+  - template:
+      ~/.gitconfig: gitconfig.j2
