@@ -35,7 +35,7 @@ humantime = "2.4"
 dirs = "6"
 tempfile = "3.27"
 petgraph = { version = "0.8", default-features = false, features = ["std", "graphmap"] }
-minijinja = "2.24"
+minijinja = "3.0"
 dotenvy = "0.15"
 os_info = { version = "3", default-features = false }
 regex = "1"
