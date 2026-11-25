@@ -2,6 +2,7 @@
 #
 # macOS only: a bundle-level `when:` skips it everywhere else.
 
+description: macOS settings.
 when: { os: macos }
 steps:
   - macos_defaults:

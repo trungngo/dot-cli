@@ -2,6 +2,7 @@
 #
 # Always applied (`implicit: true`), before everything else: what later bundles need.
 
+description: What later bundles need (Homebrew on macOS).
 implicit: true
 steps:
   # macOS: Homebrew, which the `package` steps use there. Its installer uses sudo, which dot

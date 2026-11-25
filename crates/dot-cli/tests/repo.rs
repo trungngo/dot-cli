@@ -328,6 +328,67 @@ fn repo_is_found_by_flag_env_walk_and_local_config() {
 }
 
 #[test]
+fn list_shows_every_bundle_and_its_state() {
+    let r = Repo::new();
+    r.write(
+        "repo/bundles/extra/bundle.yml",
+        "description: Not selected anywhere.\nsteps:\n  - shell: echo extra >> ~/order\n",
+    );
+    r.write(
+        "repo/bundles/desk/bundle.yml",
+        "when: { role: desktop }\nsteps:\n  - shell: echo desk >> ~/order\n",
+    );
+    let out = r.dot(&["list"]);
+    assert!(out.status.success(), "{}", both(&out));
+    let text = stdout(&out);
+    let lines: Vec<&str> = text.lines().collect();
+    assert!(
+        lines[0].starts_with("bundles in ") && lines[0].ends_with("(profile server):"),
+        "{text}"
+    );
+    let row = |name: &str| {
+        lines
+            .iter()
+            .find(|l| l.split_whitespace().next() == Some(name))
+            .unwrap_or_else(|| panic!("no {name} in {text}"))
+            .to_string()
+    };
+    assert!(row("app").contains("selected by profile server"), "{text}");
+    assert!(row("lib").contains("required by app"), "{text}");
+    assert!(row("common").contains("implicit"), "{text}");
+    assert!(
+        row("gui").contains("skipped here (when: role is server, not desktop)"),
+        "{text}"
+    );
+    assert!(
+        row("desk").contains("not for this machine (when: role is server, not desktop)"),
+        "{text}"
+    );
+    assert!(
+        row("extra").contains("available") && row("extra").ends_with("Not selected anywhere."),
+        "{text}"
+    );
+    assert!(text.contains("`dot apply <bundle>`"), "{text}");
+    assert_eq!(stdout(&r.dot(&["ls"])), text);
+
+    let out = r.dot(&["list", "--json"]);
+    assert!(out.status.success(), "{}", both(&out));
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let names: Vec<&str> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["app", "common", "desk", "extra", "gui", "lib"]);
+    let extra = &v[3];
+    assert_eq!(extra["state"], "available");
+    assert_eq!(extra["description"], "Not selected anywhere.");
+    assert_eq!(v[4]["state"], "skipped");
+    assert_eq!(v[2]["state"], "unavailable");
+}
+
+#[test]
 fn graph_and_why() {
     let r = Repo::new();
     let out = r.dot(&["graph"]);

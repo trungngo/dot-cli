@@ -2,6 +2,7 @@
 #
 # Command-line tools. `fd` and `ripgrep` are mapped to each package manager's names in dot.yml.
 
+description: Command-line tools (fd, ripgrep).
 after: [common]
 steps:
   - package: [fd, ripgrep]

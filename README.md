@@ -286,6 +286,7 @@ each directive behave, and why.
 | `dot apply [bundles]` | Apply the profile's bundles (or the named ones and their dependencies). Useful flags: `--dry-run`, `--yes`, `--upgrade`, `--jobs N`, `--var NAME=value`, and `--host user@host` with `--all-secrets` / `--no-secrets`, `--persist-secrets` (`--force-secrets`), `--dot-binary PATH`. |
 | `dot plan [bundles]` | Show the resolved order and every step's state without changing anything. |
 | `dot check` | Validate every file in the repository and the bundle graph, with the file and line of each error. A file that doesn't parse (an unknown key, a YAML error) stops at its first error. |
+| `dot list` | List every bundle in the repository with its `description`, and whether this machine's run includes it and why; `available` ones can be installed with `dot apply <bundle>` (`--json` for scripts). |
 | `dot graph [--dot]` / `dot why <bundle>` | Show the bundle graph, or explain why a bundle is (or isn't) part of a run. |
 | `dot vars` / `dot facts` | Show variables with their sources (secrets redacted), or the detected facts. |
 | `dot env --shell zsh` | Print a file for your shell to source, with variables and what `path` / `env` steps set up (`--cache` keeps it and prints its path). |

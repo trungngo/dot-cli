@@ -4,6 +4,7 @@
 # where it lives. The file is written owner-only (0600), and the value never appears in dot's
 # output or logs.
 
+description: A config file holding a secret.
 after: [common]
 steps:
   - template:

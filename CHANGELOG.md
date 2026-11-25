@@ -20,7 +20,7 @@ format; such changes are called out).
     `service` (systemd, launchd, Windows services), `macos_defaults`, `user`, `path` / `env`,
     `secret_file`, and handlers (`notify:`).
   - `dot plan`, `apply --dry-run`, `status` (drift and orphans), `diff`, `remove` (undo),
-    `adopt`, `doctor`, `graph`, `why`, `vars`, `facts`, `env --shell`, `schema`, `check`.
+    `adopt`, `doctor`, `list`, `graph`, `why`, `vars`, `facts`, `env --shell`, `schema`, `check`.
   - Secrets by logical name from an owner-only env file or LastPass (`secrets.yml`), redacted
     everywhere; `dot secrets check|push|export|import`.
   - `dot apply --host` (over ssh), `dot cloud-init` (installs the same version as the `dot`

@@ -34,8 +34,8 @@ use crate::render::tty::TtyPrompter;
 use crate::render::{Mode, Verbosity};
 use crate::secrets::{self, SecretsPrepare};
 use crate::{
-    ApplyArgs, CheckArgs, EXIT_CONFIG, GraphArgs, PlanArgs, RepoArgs, SecretsCheckArgs, VarsArgs,
-    WhyArgs,
+    ApplyArgs, CheckArgs, EXIT_CONFIG, GraphArgs, ListArgs, PlanArgs, RepoArgs, SecretsCheckArgs,
+    VarsArgs, WhyArgs,
 };
 
 pub(crate) fn config_exit() -> ExitCode {
@@ -951,7 +951,138 @@ fn check_files(paths: &[PathBuf]) -> ExitCode {
 }
 
 // ---------------------------------------------------------------------------------------------
-// graph / why / vars
+// list / graph / why / vars
+
+/// How a bundle relates to this machine's run (the profile's selection).
+#[derive(Debug, PartialEq, Eq)]
+enum ListState {
+    /// Part of the run; the first reason it is.
+    Included(String),
+    /// Selected or required, but its `when:` does not match here.
+    Skipped(String),
+    /// Not part of the run; installable with `dot apply <name>`.
+    Available,
+    /// Its own `when:` does not match this machine.
+    Unavailable(String),
+}
+
+impl ListState {
+    fn key(&self) -> &'static str {
+        match self {
+            ListState::Included(_) => "included",
+            ListState::Skipped(_) => "skipped",
+            ListState::Available => "available",
+            ListState::Unavailable(_) => "unavailable",
+        }
+    }
+
+    fn detail(&self) -> Option<&str> {
+        match self {
+            ListState::Included(d) | ListState::Skipped(d) | ListState::Unavailable(d) => Some(d),
+            ListState::Available => None,
+        }
+    }
+
+    fn text(&self) -> String {
+        match self {
+            ListState::Included(r) => r.clone(),
+            ListState::Skipped(w) => format!("skipped here ({w})"),
+            ListState::Available => "available".into(),
+            ListState::Unavailable(w) => format!("not for this machine ({w})"),
+        }
+    }
+}
+
+pub fn list(a: ListArgs) -> Result<ExitCode> {
+    let (ws, _) = match open(&a.repo)? {
+        Ok(x) => x,
+        Err(code) => return Ok(code),
+    };
+    // A graph that does not resolve still leaves every bundle worth listing.
+    let res = ws.resolve(&[], false).unwrap_or_else(|errs| {
+        for e in errs {
+            eprintln!("warning: {e}");
+        }
+        Resolution::default()
+    });
+    let rows: Vec<(&Bundle, ListState)> = ws
+        .repo
+        .bundles
+        .values()
+        .map(|b| (b, list_state(&ws, &res, b)))
+        .collect();
+    if a.json {
+        let items: Vec<serde_json::Value> = rows
+            .iter()
+            .map(|(b, st)| {
+                serde_json::json!({
+                    "name": b.name,
+                    "description": b.description,
+                    "file": b.file,
+                    "state": st.key(),
+                    "detail": st.detail(),
+                })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&items)?);
+    } else {
+        print!("{}", list_text(&ws, &rows));
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn list_state(ws: &Workspace, res: &Resolution, b: &Bundle) -> ListState {
+    if let Some(r) = res.get(&b.name) {
+        return ListState::Included(
+            r.reasons
+                .first()
+                .map(ToString::to_string)
+                .unwrap_or_default(),
+        );
+    }
+    if let Some(e) = res.excluded.iter().find(|e| e.name == b.name) {
+        return ListState::Skipped(e.detail.clone());
+    }
+    match b.manifest.when.as_ref().map(|w| w.eval(&ws.facts)) {
+        Some(Err(why)) => ListState::Unavailable(format!("when: {why}")),
+        _ => ListState::Available,
+    }
+}
+
+fn list_text(ws: &Workspace, rows: &[(&Bundle, ListState)]) -> String {
+    let mut out = match ws.profile_name() {
+        Some(p) => format!("bundles in {} (profile {p}):\n", ws.located.root.display()),
+        None => format!("bundles in {}:\n", ws.located.root.display()),
+    };
+    if rows.is_empty() {
+        out.push_str("  (none)\n");
+        return out;
+    }
+    let texts: Vec<String> = rows.iter().map(|(_, st)| st.text()).collect();
+    let w_name = rows.iter().map(|(b, _)| b.name.len()).max().unwrap_or(0);
+    let w_state = rows
+        .iter()
+        .zip(&texts)
+        .filter(|((b, _), _)| b.description.is_some())
+        .map(|(_, t)| t.chars().count())
+        .max()
+        .unwrap_or(0);
+    for ((b, _), text) in rows.iter().zip(&texts) {
+        let line = match &b.description {
+            Some(d) => format!("  {:<w_name$}  {text:<w_state$}  {}", b.name, d.trim()),
+            None => format!("  {:<w_name$}  {text}", b.name),
+        };
+        out.push_str(line.trim_end());
+        out.push('\n');
+    }
+    if rows
+        .iter()
+        .any(|(_, st)| matches!(st, ListState::Available))
+    {
+        out.push_str("\n`dot apply <bundle>` installs an available bundle and what it requires.\n");
+    }
+    out
+}
 
 pub fn graph(a: GraphArgs) -> Result<ExitCode> {
     let (ws, _) = match open(&a.repo)? {

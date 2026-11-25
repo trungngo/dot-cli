@@ -2,6 +2,7 @@
 #
 # git, and a ~/.gitconfig rendered from a template with variables.
 
+description: git and ~/.gitconfig.
 requires: [common]
 
 # Declared here, not in dot.yml, so only a run that includes this bundle needs them. The first

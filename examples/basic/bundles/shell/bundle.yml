@@ -3,6 +3,7 @@
 # Shell setup: files linked from this directory, and a few lines added to a file dot does not
 # own.
 
+description: Shell setup.
 after: [common]
 steps:
   - link:

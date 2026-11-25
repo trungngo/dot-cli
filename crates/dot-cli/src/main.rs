@@ -42,6 +42,10 @@ enum Command {
     /// Validate dot.yml, every bundle and the bundle graph (or the given files) and report
     /// every error.
     Check(CheckArgs),
+    /// List every bundle in the repository: its description and whether this machine's run
+    /// includes it, and why (or why not).
+    #[command(visible_alias = "ls")]
+    List(ListArgs),
     /// Show the bundle dependency graph.
     Graph(GraphArgs),
     /// Explain why a bundle is (or is not) part of a run.
@@ -340,6 +344,15 @@ pub struct GraphArgs {
 }
 
 #[derive(Args)]
+pub struct ListArgs {
+    /// One JSON array of bundles instead of a table.
+    #[arg(long)]
+    pub json: bool,
+    #[command(flatten)]
+    pub repo: RepoArgs,
+}
+
+#[derive(Args)]
 pub struct WhyArgs {
     pub bundle: String,
     #[command(flatten)]
@@ -370,6 +383,7 @@ fn main() -> ExitCode {
         Command::Apply(a) => commands::apply(a),
         Command::Plan(a) => commands::plan(a),
         Command::Check(a) => commands::check(a),
+        Command::List(a) => commands::list(a),
         Command::Graph(a) => commands::graph(a),
         Command::Why(a) => commands::why(a),
         Command::Vars(a) => commands::vars(a),
